@@ -1,0 +1,65 @@
+name: Build design report PDF
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "report.md"
+      - "figures.py"
+      - "build_pdf.py"
+      - ".github/workflows/build-pdf.yml"
+  pull_request:
+    paths:
+      - "report.md"
+      - "figures.py"
+      - "build_pdf.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install reportlab==4.2.2
+
+      - name: Build PDF
+        run: python build_pdf.py
+
+      - name: Check page count
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from reportlab.pdfbase.pdfdoc import PDFDocument
+          # Minimal page-count probe using pypdf if available, else parse trailer.
+          try:
+              from pypdf import PdfReader
+              pages = len(PdfReader("SchemaShift_Design_Report.pdf").pages)
+          except Exception:
+              data = Path("SchemaShift_Design_Report.pdf").read_bytes()
+              pages = data.count(b"/Type /Page ") + data.count(b"/Type /Page\n")
+          print(f"pages={pages}")
+          assert pages >= 12, f"report must be at least 12 pages (got {pages})"
+          PY
+
+      - name: Upload PDF artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SchemaShift_Design_Report
+          path: SchemaShift_Design_Report.pdf
+          if-no-files-found: error
+          retention-days: 30

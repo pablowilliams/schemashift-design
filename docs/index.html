@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SchemaShift — Migration Safety Reviewer</title>
+    <meta
+      name="description"
+      content="Paste a SQL migration and get a risk grade, per-statement findings, and a safer expand-migrate-contract rewrite plan. Runs entirely in your browser."
+    />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+
+    <header class="site-header">
+      <div class="site-header__inner">
+        <h1 class="site-title">
+          <span class="site-title__mark">SchemaShift</span>
+          <span aria-hidden="true"> — </span>
+          <span>Migration Safety Reviewer</span>
+        </h1>
+        <button
+          id="theme-toggle"
+          class="theme-toggle"
+          type="button"
+          aria-pressed="false"
+          aria-label="Toggle dark mode"
+        >
+          <span class="theme-toggle__label" aria-hidden="true">Dark mode</span>
+        </button>
+      </div>
+    </header>
+
+    <section class="hero" aria-labelledby="hero-h">
+      <div class="hero__inner">
+        <span class="hero__eyebrow">SchemaShift · Design Prototype</span>
+        <h2 id="hero-h" class="hero__title">
+          Grade your SQL migrations before they touch production.
+        </h2>
+        <p class="hero__lede">
+          Paste a SQL migration and receive a safety grade, flagged
+          statements highlighted in-place, and a safer expand–migrate–contract
+          rewrite plan. Analysis is rule-based and runs entirely in your
+          browser.
+        </p>
+      </div>
+    </section>
+
+    <main id="main" class="site-main" tabindex="-1">
+      <section class="panel upload-panel" aria-labelledby="upload-h">
+        <h2 id="upload-h">Paste or upload a SQL migration</h2>
+        <p class="lede">
+          Rules are adapted from the published catalogues of
+          <a href="https://squawkhq.com" rel="noopener">squawk</a> and
+          <a href="https://github.com/ankane/strong_migrations" rel="noopener">strong_migrations</a>.
+          Nothing leaves this page.
+        </p>
+
+        <div class="upload-row">
+          <label for="sql-input" class="upload-label">SQL migration</label>
+          <textarea
+            id="sql-input"
+            class="sql-input"
+            rows="10"
+            spellcheck="false"
+            wrap="off"
+            placeholder="-- Paste your SQL migration here, for example:&#10;ALTER TABLE users ADD COLUMN email VARCHAR(255);&#10;ALTER TABLE users ALTER COLUMN email SET NOT NULL;"
+            aria-describedby="sql-hint"
+          ></textarea>
+          <span id="sql-hint" class="upload-hint">
+            Postgres-focused. Large migrations are supported. Comments and
+            BEGIN/COMMIT boilerplate are ignored.
+          </span>
+
+          <div class="upload-actions">
+            <label for="sql-file" class="button button--ghost upload-file-label">
+              <span>Load .sql file</span>
+              <input
+                id="sql-file"
+                class="upload-file"
+                type="file"
+                accept=".sql,text/plain"
+              />
+            </label>
+            <button id="analyse-btn" class="button" type="button">
+              Analyse migration
+            </button>
+            <button
+              id="reset-btn"
+              class="button button--ghost"
+              type="button"
+              hidden
+            >
+              Clear and analyse another
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <div
+        id="status"
+        class="status"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      ></div>
+      <div id="error" class="alert" role="alert" hidden></div>
+
+      <section
+        id="results-section"
+        class="panel results-panel"
+        aria-labelledby="results-h"
+        hidden
+      >
+        <h2 id="results-h" tabindex="-1">Results</h2>
+
+        <div class="score-card" id="score-card">
+          <div class="score-card__ring" aria-hidden="true">
+            <svg viewBox="0 0 120 120">
+              <defs>
+                <linearGradient
+                  id="scoreGradient"
+                  x1="0%"
+                  y1="0%"
+                  x2="100%"
+                  y2="100%"
+                >
+                  <stop offset="0%" stop-color="#0a1f44" />
+                  <stop offset="55%" stop-color="#145a73" />
+                  <stop offset="100%" stop-color="#0e7c86" />
+                </linearGradient>
+              </defs>
+              <circle
+                class="ring-bg"
+                cx="60"
+                cy="60"
+                r="52"
+                fill="none"
+                stroke-width="10"
+              />
+              <circle
+                id="ring-fg"
+                class="ring-fg"
+                cx="60"
+                cy="60"
+                r="52"
+                fill="none"
+                stroke-width="10"
+                stroke-dasharray="326.73"
+                stroke-dashoffset="326.73"
+              />
+            </svg>
+            <div class="score-card__ring-text">
+              <span class="score-card__number" id="score-number">—</span>
+              <span class="score-card__out-of">/ 100</span>
+            </div>
+          </div>
+
+          <div class="score-card__meta">
+            <span class="score-card__label">Risk assessment</span>
+            <p class="score-card__title" id="score-title">Awaiting migration</p>
+          </div>
+
+          <div class="grade-badge" id="grade-badge" data-grade="pending">
+            <svg
+              class="grade-badge__glyph"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <circle cx="12" cy="12" r="10" fill="currentColor" opacity="0.18" />
+              <path
+                id="grade-glyph-path"
+                d="M6 12l4 4 8-8"
+                stroke="currentColor"
+                stroke-width="2"
+                fill="none"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            <span class="grade-badge__letter" id="grade-letter">—</span>
+            <span class="grade-badge__word" id="grade-word">Awaiting migration</span>
+          </div>
+
+          <p class="score-summary" id="score-summary"></p>
+        </div>
+
+        <span class="sr-only" id="score-sr"></span>
+      </section>
+
+      <section
+        id="findings-section"
+        class="panel findings-panel"
+        aria-labelledby="findings-h"
+        hidden
+      >
+        <h2 id="findings-h">Findings</h2>
+        <p id="findings-empty" class="findings-empty" hidden>
+          No unsafe patterns detected. The migration appears safe against the
+          current rule set.
+        </p>
+        <ol id="findings-list" class="findings-list"></ol>
+      </section>
+
+      <section
+        id="rewrites-section"
+        class="panel rewrites-panel"
+        aria-labelledby="rewrites-h"
+        hidden
+      >
+        <h2 id="rewrites-h">Safer rewrite plan</h2>
+        <p class="rewrites-intro" id="rewrites-intro">
+          An expand–migrate–contract split that avoids the risky operations
+          flagged above. Each phase should land in its own deploy.
+        </p>
+        <div class="rewrites" id="rewrites"></div>
+      </section>
+
+      <section
+        id="code-section"
+        class="panel code-panel"
+        aria-labelledby="code-h"
+        hidden
+      >
+        <h2 id="code-h">Migration with findings highlighted</h2>
+        <p class="code-hint">
+          Flagged statements are underlined by severity — solid for low,
+          dashed for medium, double for high, and double-bold with a red tint
+          for critical. Activate a highlighted span to jump to its finding.
+        </p>
+        <pre class="code-display" tabindex="0"><code id="code-display"></code></pre>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>
+        SchemaShift is an open-source design project. Analysis runs
+        client-side against a rule set adapted from published tool catalogues.
+        <a
+          class="site-footer__link"
+          href="https://github.com/pablowilliams/schemashift-design"
+          rel="noopener"
+          >View source on GitHub</a
+        >.
+      </p>
+    </footer>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
